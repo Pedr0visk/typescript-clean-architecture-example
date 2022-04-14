@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-deployment
+  namespace: nvg-cdp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: config
+  template:
+    metadata:
+      labels:
+        component: config
+    spec:
+      imagePullSecrets:
+        - name: all-icr-io
+      containers:
+        - name: nvg-cdp-config
+          image: injection-image-iks
+          ports:
+            - containerPort: 8000
+          resources:
+            limits:
+              cpu: "250m"
+              memory: "550Mi"
+          env:
+            - name: APP_NAME
+              value: config-app
+            - name: TYPEORM_CONNECTION
+              value: postgres
+            - name: TYPEORM_HOST
+              value: config-postgres-cluster-ip-service
+            - name: TYPEORM_USERNAME
+              value: admin
+            - name: TYPEORM_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: config-database-password
+                  key: POSTGRES_PASSWORD
+            - name: TYPEORM_DATABASE
+              value: config_db
+            - name: TYPEORM_PORT
+              value: "5432"
+            - name: TYPEORM_MIGRATIONS
+              value: infraestructure/adapters/orm/postgres/migrations/*.js
+            - name: TYPEORM_MIGRATIONS_DIR
+              value: infraestructure/adapters/orm/postgres/migrations
+            - name: TYPEORM_ENTITIES
+              value: infraestructure/adapters/orm/postgres/entities/*.js
+            - name: TYPEORM_ENTITIES_DIR
+              value: infraestructure/adapters/orm/postgres/entities
+            # -
+            - name: ALLOWED_CORS_HOSTS
+              value: https://bulma-b3c-4x16-3f10f1910b7ec0b1bd973da20db66b8f-0000.us-south.containers.appdomain.cloud,localhost,127.0.0.1
+            # -
+            - name: REDIS_HOST
+              value: redis-0.redis.redis.svc.cluster.local
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: config-redis-password
+                  key: REDIS_PASSWORD
+            # -
+            - name: KAFKA_BROKERS
+              value: my-cluster-kafka-bootstrap.kafka:9092
+            # -
+            - name: NODE_ENV
+              value: production
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-cluster-ip-service
+  namespace: nvg-cdp
+spec:
+  type: ClusterIP
+  selector:
+    component: config
+  ports:
+    - port: 8000
+      targetPort: 8000
